@@ -25,7 +25,6 @@ class Game {
         
         this.keys = {};
         this.setupEventListeners();
-        this.setupGameScreenEventListeners();
         
         this.lastFrameTime = 0;
         this.requestAnimationFrameId = null;
@@ -35,25 +34,25 @@ class Game {
         // Define 5 tracks per difficulty level
         this.tracks = {
             1: [
-                { name: 'Tokyo', timeLimit: 120, difficulty: 0.8, width: 100 },
-                { name: 'Paris', timeLimit: 130, difficulty: 0.85, width: 110 },
-                { name: 'London', timeLimit: 125, difficulty: 0.9, width: 105 },
-                { name: 'New York', timeLimit: 140, difficulty: 0.95, width: 115 },
-                { name: 'Sydney', timeLimit: 150, difficulty: 1.0, width: 120 }
+                { name: 'Tokyo', timeLimit: 60, difficulty: 0.8, width: 100 },
+                { name: 'Paris', timeLimit: 65, difficulty: 0.85, width: 100 },
+                { name: 'London', timeLimit: 70, difficulty: 0.9, width: 100 },
+                { name: 'New York', timeLimit: 75, difficulty: 0.95, width: 100 },
+                { name: 'Sydney', timeLimit: 80, difficulty: 1.0, width: 100 }
             ],
             2: [
-                { name: 'Tokyo', timeLimit: 100, difficulty: 1.2, width: 90 },
-                { name: 'Paris', timeLimit: 110, difficulty: 1.3, width: 95 },
-                { name: 'London', timeLimit: 105, difficulty: 1.4, width: 100 },
-                { name: 'New York', timeLimit: 120, difficulty: 1.5, width: 105 },
-                { name: 'Sydney', timeLimit: 130, difficulty: 1.6, width: 110 }
+                { name: 'Tokyo', timeLimit: 50, difficulty: 1.2, width: 80 },
+                { name: 'Paris', timeLimit: 55, difficulty: 1.3, width: 80 },
+                { name: 'London', timeLimit: 60, difficulty: 1.4, width: 80 },
+                { name: 'New York', timeLimit: 65, difficulty: 1.5, width: 80 },
+                { name: 'Sydney', timeLimit: 70, difficulty: 1.6, width: 80 }
             ],
             3: [
-                { name: 'Tokyo', timeLimit: 80, difficulty: 1.6, width: 80 },
-                { name: 'Paris', timeLimit: 90, difficulty: 1.7, width: 85 },
-                { name: 'London', timeLimit: 85, difficulty: 1.8, width: 90 },
-                { name: 'New York', timeLimit: 100, difficulty: 1.9, width: 95 },
-                { name: 'Sydney', timeLimit: 110, difficulty: 2.0, width: 100 }
+                { name: 'Tokyo', timeLimit: 40, difficulty: 1.6, width: 60 },
+                { name: 'Paris', timeLimit: 45, difficulty: 1.7, width: 60 },
+                { name: 'London', timeLimit: 50, difficulty: 1.8, width: 60 },
+                { name: 'New York', timeLimit: 55, difficulty: 1.9, width: 60 },
+                { name: 'Sydney', timeLimit: 60, difficulty: 2.0, width: 60 }
             ]
         };
     }
@@ -92,10 +91,6 @@ class Game {
         window.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
         });
-    }
-    
-    setupGameScreenEventListeners() {
-        // Game screen is setup in the main HTML
     }
     
     showScreen(screenId) {
@@ -141,24 +136,25 @@ class Game {
         
         // Create player
         this.player = new Player(
-            this.width / 2 - 20,
-            this.height - 100,
-            trackData.difficulty
+            this.width / 2,
+            this.height - 150,
+            trackData
         );
         
-        // Create opponents
+        // Create opponents with better starting positions
         this.opponents = [];
         const opponentStarts = [
-            { x: this.width / 2 + 20, y: this.height - 100 },
-            { x: this.width / 2 - 60, y: this.height - 100 },
-            { x: this.width / 2 + 60, y: this.height - 100 }
+            { x: this.width / 2 - 40, y: this.height - 150 },
+            { x: this.width / 2 + 40, y: this.height - 150 },
+            { x: this.width / 2, y: this.height - 100 }
         ];
         
         for (let i = 0; i < 3; i++) {
             const opp = new Opponent(
                 opponentStarts[i].x,
                 opponentStarts[i].y,
-                trackData.difficulty * (0.8 + i * 0.1)
+                trackData,
+                i + 1
             );
             this.opponents.push(opp);
         }
@@ -181,7 +177,7 @@ class Game {
     
     gameLoop() {
         const now = Date.now();
-        const deltaTime = (now - this.lastFrameTime) / 1000;
+        const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 0.016);
         this.lastFrameTime = now;
         
         if (!this.gameRunning) return;
@@ -211,17 +207,16 @@ class Game {
         this.updatePlayerInput();
         this.player.update(deltaTime, this.track);
         
-        // Check collisions
-        this.checkPlayerCollisions();
-        
         // Update opponents
         this.opponents.forEach(opp => {
-            opp.update(deltaTime, this.track);
-            this.checkOpponentCollisions(opp);
+            opp.update(deltaTime, this.track, this.player);
         });
         
+        // Calculate positions
+        this.calculatePositions();
+        
         // Check if player finished
-        if (!this.finished && this.player.progress >= 1 && this.player.y > this.height - 50) {
+        if (!this.finished && this.player.distanceTraveled >= this.track.trackLength && this.player.y < this.height - 80) {
             this.finishRace();
         }
         
@@ -229,18 +224,23 @@ class Game {
         this.updateUI();
     }
     
+    calculatePositions() {
+        const allCars = [this.player, ...this.opponents];
+        allCars.sort((a, b) => b.distanceTraveled - a.distanceTraveled);
+        
+        this.finishPosition = allCars.indexOf(this.player) + 1;
+    }
+    
     updatePlayerInput() {
         const keys = this.keys;
         
-        if (keys['arrowup'] || keys['w']) this.player.moveForward();
-        if (keys['arrowdown'] || keys['s']) this.player.moveBackward();
+        // Steering
         if (keys['arrowleft'] || keys['a']) this.player.turnLeft();
         if (keys['arrowright'] || keys['d']) this.player.turnRight();
         
-        // Throttle
-        if (keys['a'] || keys['z']) this.player.throttle();
-        // Brake
-        if (keys['s'] || keys['x']) this.player.brake();
+        // Throttle and Brake
+        if (keys['arrowup'] || keys['w'] || keys['z']) this.player.throttle();
+        if (keys['arrowdown'] || keys['s'] || keys['x']) this.player.brake();
         
         // Gear change
         if (keys['g'] && !this.lastGKey) {
@@ -249,44 +249,9 @@ class Game {
         this.lastGKey = keys['g'];
     }
     
-    checkPlayerCollisions() {
-        const pos = this.player.getGridPosition();
-        
-        // Check track bounds
-        if (!this.track.isPositionValid(pos.gridX, pos.gridY)) {
-            this.player.crash();
-        }
-        
-        // Check opponent collisions
-        this.opponents.forEach(opp => {
-            const oppPos = opp.getGridPosition();
-            if (Math.abs(pos.gridX - oppPos.gridX) < 2 && Math.abs(pos.gridY - oppPos.gridY) < 2) {
-                this.player.crash();
-            }
-        });
-    }
-    
-    checkOpponentCollisions(opp) {
-        const oppPos = opp.getGridPosition();
-        
-        if (!this.track.isPositionValid(oppPos.gridX, oppPos.gridY)) {
-            opp.crash();
-        }
-    }
-    
     finishRace() {
         this.finished = true;
-        
-        // Calculate position
-        const positions = [this.player, ...this.opponents].sort((a, b) => {
-            const diff = b.progress - a.progress;
-            if (diff !== 0) return diff;
-            return b.y - a.y;
-        });
-        
-        this.finishPosition = positions.indexOf(this.player) + 1;
-        
-        setTimeout(() => this.endRace(), 2000);
+        setTimeout(() => this.endRace(), 1500);
     }
     
     endRace() {
@@ -296,7 +261,7 @@ class Game {
             // Advance to next track
             if (this.currentTrack < 5) {
                 this.currentTrack++;
-                setTimeout(() => this.startTrack(), 1000);
+                setTimeout(() => this.startTrack(), 1500);
             } else {
                 // Game complete
                 this.showGameOver(true);
@@ -315,7 +280,7 @@ class Game {
         if (success) {
             title.textContent = 'CONGRATULATIONS!';
         } else {
-            title.textContent = this.timeLimitReached ? 'TIME UP!' : 'RACE OVER';
+            title.textContent = this.timeLimitReached ? 'TIME UP!' : this.finishPosition > 3 ? 'TOO SLOW!' : 'RACE OVER';
         }
         
         document.getElementById('finalPosition').textContent = this.finishPosition;
@@ -326,7 +291,7 @@ class Game {
     updateUI() {
         document.getElementById('position').textContent = `${this.finishPosition}/${this.opponents.length + 1}`;
         document.getElementById('timer').textContent = this.formatTime(this.timeLeft);
-        document.getElementById('speed').textContent = Math.round(this.player.speed * 10);
+        document.getElementById('speed').textContent = Math.round(this.player.speed * 3.6); // km/h
         document.getElementById('gear').textContent = this.player.gear === 'LOW' ? 'LOW' : 'HI';
     }
     
@@ -337,7 +302,7 @@ class Game {
     }
     
     draw() {
-        this.ctx.fillStyle = '#1a1a1a';
+        this.ctx.fillStyle = '#0a0a0a';
         this.ctx.fillRect(0, 0, this.width, this.height);
         
         // Draw track
@@ -346,6 +311,25 @@ class Game {
         // Draw game objects
         this.player.draw(this.ctx);
         this.opponents.forEach(opp => opp.draw(this.ctx));
+        
+        // Draw finish line indicator
+        this.drawFinishLine();
+    }
+    
+    drawFinishLine() {
+        const finishY = -100;
+        const screenY = finishY - this.player.y + this.height / 2;
+        
+        if (screenY > 0 && screenY < this.height) {
+            this.ctx.strokeStyle = '#ffff00';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([10, 10]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, screenY);
+            this.ctx.lineTo(this.width, screenY);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+        }
     }
 }
 
@@ -354,171 +338,185 @@ class Track {
         this.trackData = trackData;
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
-        this.gridSize = 20;
+        this.trackLength = 3000; // Total track distance
+        this.trackWidth = trackData.width;
         this.generateTrack();
     }
     
     generateTrack() {
-        // Generate a simple track layout
-        this.trackGrid = [];
-        const rows = Math.ceil(this.canvasHeight / this.gridSize) + 2;
-        const cols = Math.ceil(this.canvasWidth / this.gridSize);
+        // Generate track waypoints
+        this.waypoints = [];
+        const numWaypoints = Math.floor(this.trackLength / 150);
         
-        for (let y = 0; y < rows; y++) {
-            this.trackGrid[y] = [];
-            for (let x = 0; x < cols; x++) {
-                // Create track with some variation
-                let isTrack = false;
-                
-                // Main track down the middle
-                const centerX = cols / 2;
-                if (Math.abs(x - centerX) < this.trackData.width / this.gridSize / 2) {
-                    isTrack = true;
-                }
-                
-                // Add some curves
-                const waveAmount = Math.sin(y * 0.1) * 2;
-                if (Math.abs(x - centerX - waveAmount) < this.trackData.width / this.gridSize / 2) {
-                    isTrack = true;
-                }
-                
-                this.trackGrid[y][x] = isTrack ? 'track' : 'wall';
-            }
+        for (let i = 0; i < numWaypoints; i++) {
+            const t = i / numWaypoints;
+            const wave = Math.sin(t * Math.PI * 3) * 60;
+            
+            this.waypoints.push({
+                x: this.canvasWidth / 2 + wave,
+                y: -i * 150,
+                width: this.trackWidth
+            });
         }
+        
+        // Add finish line
+        this.waypoints.push({
+            x: this.canvasWidth / 2,
+            y: -this.trackLength,
+            width: this.trackWidth
+        });
     }
     
-    isPositionValid(gridX, gridY) {
-        if (gridY < 0 || gridY >= this.trackGrid.length || gridX < 0 || gridX >= this.trackGrid[0].length) {
-            return false;
+    isPositionValid(x, y) {
+        // Find closest waypoint
+        let closestWaypoint = this.waypoints[0];
+        let closestDist = Infinity;
+        
+        for (let wp of this.waypoints) {
+            const dist = Math.abs(y - wp.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestWaypoint = wp;
+            }
         }
-        return this.trackGrid[gridY][gridX] === 'track';
+        
+        // Check if within track bounds
+        const distFromCenter = Math.abs(x - closestWaypoint.x);
+        return distFromCenter < closestWaypoint.width / 2;
+    }
+    
+    getTrackCenterX(y) {
+        // Find closest waypoint
+        let closest = this.waypoints[0];
+        let closestDist = Infinity;
+        
+        for (let wp of this.waypoints) {
+            const dist = Math.abs(y - wp.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = wp;
+            }
+        }
+        
+        return closest.x;
     }
     
     draw(ctx, player) {
-        const scrollY = Math.max(0, player.y - this.canvasHeight / 2);
-        
-        for (let y = 0; y < this.trackGrid.length; y++) {
-            for (let x = 0; x < this.trackGrid[y].length; x++) {
-                const screenY = y * this.gridSize - scrollY;
-                const screenX = x * this.gridSize;
-                
-                if (screenY > -this.gridSize && screenY < this.canvasHeight) {
-                    if (this.trackGrid[y][x] === 'track') {
-                        ctx.fillStyle = '#333';
-                        ctx.fillRect(screenX, screenY, this.gridSize, this.gridSize);
-                        
-                        // Draw track markings
-                        if (y % 3 === 0) {
-                            ctx.fillStyle = '#555';
-                            ctx.fillRect(screenX, screenY, this.gridSize, 2);
-                        }
-                    } else {
-                        ctx.fillStyle = '#1a1a1a';
-                        ctx.fillRect(screenX, screenY, this.gridSize, this.gridSize);
-                    }
-                }
-            }
-        }
-        
-        // Draw track borders
+        // Draw track
+        ctx.fillStyle = '#2a2a2a';
         ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 2;
-        for (let y = 0; y < this.trackGrid.length; y++) {
-            for (let x = 0; x < this.trackGrid[y].length; x++) {
-                const screenY = y * this.gridSize - scrollY;
-                const screenX = x * this.gridSize;
+        ctx.lineWidth = 3;
+        
+        const screenCenterY = ctx.canvas.height / 2;
+        
+        for (let i = 0; i < this.waypoints.length - 1; i++) {
+            const wp1 = this.waypoints[i];
+            const wp2 = this.waypoints[i + 1];
+            
+            const screenY1 = wp1.y - player.y + screenCenterY;
+            const screenY2 = wp2.y - player.y + screenCenterY;
+            
+            if (screenY1 > -150 && screenY1 < ctx.canvas.height + 150) {
+                // Draw track area
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(
+                    wp1.x - wp1.width / 2,
+                    screenY1,
+                    wp1.width,
+                    Math.abs(screenY2 - screenY1) + 20
+                );
                 
-                if (screenY > -this.gridSize && screenY < this.canvasHeight) {
-                    if (this.trackGrid[y][x] === 'wall') {
-                        // Check if adjacent to track
-                        let isEdge = false;
-                        if ((x > 0 && this.trackGrid[y][x-1] === 'track') ||
-                            (x < this.trackGrid[y].length - 1 && this.trackGrid[y][x+1] === 'track') ||
-                            (y > 0 && this.trackGrid[y-1][x] === 'track') ||
-                            (y < this.trackGrid.length - 1 && this.trackGrid[y+1][x] === 'track')) {
-                            isEdge = true;
-                        }
-                        
-                        if (isEdge) {
-                            ctx.strokeRect(screenX, screenY, this.gridSize, this.gridSize);
-                        }
-                    }
-                }
+                // Draw track borders
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(wp1.x - wp1.width / 2, screenY1);
+                ctx.lineTo(wp1.x - wp1.width / 2, screenY2);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(wp1.x + wp1.width / 2, screenY1);
+                ctx.lineTo(wp1.x + wp1.width / 2, screenY2);
+                ctx.stroke();
+                
+                // Draw center line
+                ctx.strokeStyle = '#555';
+                ctx.setLineDash([20, 20]);
+                ctx.beginPath();
+                ctx.moveTo(wp1.x, screenY1);
+                ctx.lineTo(wp1.x, screenY2);
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
         }
     }
 }
 
 class Player {
-    constructor(x, y, difficulty) {
+    constructor(x, y, trackData) {
         this.x = x;
         this.y = y;
-        this.difficulty = difficulty;
-        this.width = 20;
-        this.height = 30;
-        this.speed = 0;
-        this.angle = -Math.PI / 2; // Facing up
-        this.maxSpeed = 300;
-        this.acceleration = 150;
+        this.trackData = trackData;
+        this.width = 16;
+        this.height = 24;
+        this.speed = 0; // m/s
+        this.angle = 0; // radians (0 = up)
+        
+        // Speed limits
+        this.maxSpeedLow = 20; // m/s ~ 72 km/h
+        this.maxSpeedHi = 30; // m/s ~ 108 km/h
+        this.maxSpeed = this.maxSpeedLow;
+        this.acceleration = 12; // m/s^2
+        this.brakeAccel = 20; // m/s^2
+        
         this.gear = 'LOW';
-        this.gearMultiplier = 1;
-        this.progress = 0;
+        this.distanceTraveled = 0;
+        
         this.crashed = false;
         this.crashTimer = 0;
-        this.gridSize = 20;
-    }
-    
-    moveForward() {
-        if (!this.crashed) {
-            this.speed = Math.min(this.maxSpeed * this.gearMultiplier, this.speed + this.acceleration * 0.016);
-        }
-    }
-    
-    moveBackward() {
-        this.speed = Math.max(-this.maxSpeed * 0.5, this.speed - this.acceleration * 0.5 * 0.016);
+        this.lastValidX = x;
+        this.lastValidY = y;
     }
     
     turnLeft() {
-        if (this.speed !== 0) {
-            const turnRate = (Math.abs(this.speed) / this.maxSpeed) * 0.1;
+        if (this.speed > 1) {
+            const turnRate = (Math.min(Math.abs(this.speed), this.maxSpeed) / this.maxSpeed) * 0.08;
             this.angle -= turnRate;
         }
     }
     
     turnRight() {
-        if (this.speed !== 0) {
-            const turnRate = (Math.abs(this.speed) / this.maxSpeed) * 0.1;
+        if (this.speed > 1) {
+            const turnRate = (Math.min(Math.abs(this.speed), this.maxSpeed) / this.maxSpeed) * 0.08;
             this.angle += turnRate;
         }
     }
     
     throttle() {
-        this.moveForward();
+        if (!this.crashed) {
+            this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * 0.016);
+        }
     }
     
     brake() {
-        this.speed = Math.max(0, this.speed - this.acceleration * 0.016);
+        this.speed = Math.max(0, this.speed - this.brakeAccel * 0.016);
     }
     
     toggleGear() {
         if (this.gear === 'LOW') {
             this.gear = 'HI';
-            this.gearMultiplier = 1.5;
+            this.maxSpeed = this.maxSpeedHi;
         } else {
             this.gear = 'LOW';
-            this.gearMultiplier = 1;
+            this.maxSpeed = this.maxSpeedLow;
         }
     }
     
     crash() {
         if (!this.crashed) {
             this.crashed = true;
-            this.crashTimer = 1; // 1 second of invulnerability
-            this.speed *= 0.3;
-            
-            // Slight position adjustment
-            this.x += (Math.random() - 0.5) * 20;
-            this.y += (Math.random() - 0.5) * 20;
+            this.crashTimer = 0.3;
+            this.speed *= 0.5;
         }
     }
     
@@ -532,37 +530,33 @@ class Player {
         }
         
         // Apply friction
-        this.speed *= 0.98;
+        this.speed *= 0.97;
         
         // Update position
-        this.x += Math.cos(this.angle) * this.speed * deltaTime;
-        this.y += Math.sin(this.angle) * this.speed * deltaTime;
+        const newX = this.x + Math.sin(this.angle) * this.speed * deltaTime;
+        const newY = this.y - Math.cos(this.angle) * this.speed * deltaTime;
         
-        // Update progress
-        if (this.speed > 0) {
-            this.progress = Math.min(1, this.progress + this.speed * deltaTime / 10000);
+        // Check track bounds
+        if (track.isPositionValid(newX, newY)) {
+            this.x = newX;
+            this.y = newY;
+            this.lastValidX = this.x;
+            this.lastValidY = this.y;
+        } else {
+            // Keep position, bounce back
+            this.x = this.lastValidX;
+            this.y = this.lastValidY;
+            this.crash();
         }
         
-        // Bounce off walls
-        const pos = this.getGridPosition();
-        if (!track.isPositionValid(pos.gridX, pos.gridY)) {
-            this.x -= Math.cos(this.angle) * this.speed * deltaTime;
-            this.y -= Math.sin(this.angle) * this.speed * deltaTime;
-            this.speed *= 0.7;
-        }
-    }
-    
-    getGridPosition() {
-        return {
-            gridX: Math.floor(this.x / this.gridSize),
-            gridY: Math.floor(this.y / this.gridSize)
-        };
+        // Update distance traveled (progress up the track)
+        this.distanceTraveled = -this.y;
     }
     
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle + Math.PI / 2);
+        ctx.rotate(this.angle);
         
         // Draw car body
         ctx.fillStyle = this.crashed ? '#ff4444' : '#00ff00';
@@ -572,32 +566,53 @@ class Player {
         ctx.fillStyle = '#00aaff';
         ctx.fillRect(-this.width / 2 + 2, -this.height / 2 + 2, this.width - 4, this.height / 3);
         
+        // Draw headlights
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(-this.width / 2 + 3, -this.height / 2 - 1, 2, 2);
+        ctx.fillRect(this.width / 2 - 5, -this.height / 2 - 1, 2, 2);
+        
         ctx.restore();
     }
 }
 
 class Opponent extends Player {
-    constructor(x, y, difficulty) {
-        super(x, y, difficulty);
+    constructor(x, y, trackData, id) {
+        super(x, y, trackData);
+        this.id = id;
         this.aiTimer = 0;
-        this.targetAngle = 0;
+        this.aiDecisionTimer = 0;
+        this.colors = ['#ff4444', '#ffff00', '#00ffff'];
+        this.color = this.colors[id - 1];
     }
     
-    update(deltaTime, track) {
-        // Simple AI
+    update(deltaTime, track, player) {
+        // AI decision making every 0.3 seconds
         this.aiTimer += deltaTime;
+        this.aiDecisionTimer -= deltaTime;
         
-        // Decide action every 0.3 seconds
-        if (this.aiTimer > 0.3) {
-            this.aiTimer = 0;
+        if (this.aiDecisionTimer <= 0) {
+            this.aiDecisionTimer = 0.3;
             
-            // Try to move forward
-            if (Math.random() > 0.1) {
-                this.moveForward();
+            // Always try to accelerate
+            if (Math.random() > 0.05) {
+                this.throttle();
+            } else {
+                this.brake();
             }
             
-            // Random turning
-            if (Math.random() > 0.5) {
+            // Try to stay on track
+            const trackCenterX = track.getTrackCenterX(this.y);
+            const distFromCenter = this.x - trackCenterX;
+            
+            if (Math.abs(distFromCenter) > track.trackData.width / 3) {
+                // Steer back to track
+                if (distFromCenter > 0) {
+                    this.turnLeft();
+                } else {
+                    this.turnRight();
+                }
+            } else if (Math.random() > 0.8) {
+                // Random steering
                 if (Math.random() > 0.5) {
                     this.turnLeft();
                 } else {
@@ -613,10 +628,10 @@ class Opponent extends Player {
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle + Math.PI / 2);
+        ctx.rotate(this.angle);
         
         // Draw car body
-        ctx.fillStyle = this.crashed ? '#ff4444' : '#ff0000';
+        ctx.fillStyle = this.crashed ? '#ff4444' : this.color;
         ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
         
         // Draw windshield
