@@ -1,4 +1,4 @@
-// F-1 Race Game - Web Implementation
+// F-1 Race Game - Complete Rewrite
 
 class Game {
     constructor() {
@@ -9,62 +9,30 @@ class Game {
         
         this.difficulty = 1;
         this.currentTrack = 1;
-        this.gameState = 'menu'; // menu, difficulty, game, gameOver
+        this.gameState = 'menu';
         this.gameRunning = false;
-        this.timeLimitReached = false;
         
-        this.setupTracks();
         this.player = null;
         this.opponents = [];
         this.track = null;
-        this.timeLeft = 0;
-        this.gameTime = 0;
+        
         this.elapsedTime = 0;
+        this.timeLeft = 0;
         this.finished = false;
         this.finishPosition = 0;
         
         this.keys = {};
-        this.gearPressed = false; // Track gear key separately
-        this.setupEventListeners();
+        this.lastGear = false;
         
         this.lastFrameTime = 0;
-        this.requestAnimationFrameId = null;
-    }
-    
-    setupTracks() {
-        // Define 5 tracks per difficulty level
-        this.tracks = {
-            1: [
-                { name: 'Tokyo', timeLimit: 60, difficulty: 0.8, width: 100 },
-                { name: 'Paris', timeLimit: 65, difficulty: 0.85, width: 100 },
-                { name: 'London', timeLimit: 70, difficulty: 0.9, width: 100 },
-                { name: 'New York', timeLimit: 75, difficulty: 0.95, width: 100 },
-                { name: 'Sydney', timeLimit: 80, difficulty: 1.0, width: 100 }
-            ],
-            2: [
-                { name: 'Tokyo', timeLimit: 50, difficulty: 1.2, width: 80 },
-                { name: 'Paris', timeLimit: 55, difficulty: 1.3, width: 80 },
-                { name: 'London', timeLimit: 60, difficulty: 1.4, width: 80 },
-                { name: 'New York', timeLimit: 65, difficulty: 1.5, width: 80 },
-                { name: 'Sydney', timeLimit: 70, difficulty: 1.6, width: 80 }
-            ],
-            3: [
-                { name: 'Tokyo', timeLimit: 40, difficulty: 1.6, width: 60 },
-                { name: 'Paris', timeLimit: 45, difficulty: 1.7, width: 60 },
-                { name: 'London', timeLimit: 50, difficulty: 1.8, width: 60 },
-                { name: 'New York', timeLimit: 55, difficulty: 1.9, width: 60 },
-                { name: 'Sydney', timeLimit: 60, difficulty: 2.0, width: 60 }
-            ]
-        };
+        this.setupEventListeners();
     }
     
     setupEventListeners() {
-        // Menu buttons
         document.getElementById('startBtn').addEventListener('click', () => this.showDifficulty());
         document.getElementById('instructionsBtn').addEventListener('click', () => this.showInstructions());
         document.getElementById('aboutBtn').addEventListener('click', () => this.showAbout());
         
-        // Difficulty buttons
         document.querySelectorAll('.difficulty-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.difficulty = parseInt(e.currentTarget.dataset.difficulty);
@@ -75,52 +43,38 @@ class Game {
         document.getElementById('backBtn').addEventListener('click', () => this.showMenu());
         document.getElementById('backFromInstructionsBtn').addEventListener('click', () => this.showMenu());
         document.getElementById('backFromAboutBtn').addEventListener('click', () => this.showMenu());
-        
-        // Game over buttons
         document.getElementById('retryBtn').addEventListener('click', () => this.resetTrack());
-        document.getElementById('menuBtn').addEventListener('click', () => {
-            this.stopGame();
-            this.showMenu();
+        document.getElementById('menuBtn').addEventListener('click', () => this.showMenu());
+        
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.key.toLowerCase()] = true;
+            
+            // Gear switch
+            if (e.key.toLowerCase() === 'g' && !this.lastGear && this.player) {
+                this.lastGear = true;
+                this.player.switchGear();
+            }
         });
         
-        // Keyboard controls
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            this.keys[key] = true;
-            
-            // Handle gear key with proper detection
-            if (key === 'g' && !this.gearPressed) {
-                this.gearPressed = true;
-                if (this.player) {
-                    this.player.toggleGear();
-                }
-            }
-            if (e.key === ' ') e.preventDefault();
-        });
-        
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            this.keys[key] = false;
-            
-            if (key === 'g') {
-                this.gearPressed = false;
-            }
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.key.toLowerCase()] = false;
+            if (e.key.toLowerCase() === 'g') this.lastGear = false;
         });
     }
     
     showScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
     }
     
     showMenu() {
+        this.gameRunning = false;
         this.showScreen('menuScreen');
         this.gameState = 'menu';
     }
     
     showDifficulty() {
         this.showScreen('difficultyScreen');
-        this.gameState = 'difficulty';
     }
     
     showInstructions() {
@@ -140,158 +94,110 @@ class Game {
         this.showScreen('gameScreen');
         this.gameState = 'game';
         this.gameRunning = true;
+        this.elapsedTime = 0;
         this.finished = false;
         this.finishPosition = 0;
-        this.timeLimitReached = false;
-        this.elapsedTime = 0;
-        this.gearPressed = false;
+        this.lastGear = false;
         
-        const trackData = this.tracks[this.difficulty][this.currentTrack - 1];
-        this.track = new Track(trackData, this.width, this.height);
-        this.timeLeft = trackData.timeLimit;
-        
-        // Create player
-        this.player = new Player(
-            this.width / 2,
-            this.height - 150,
-            trackData
-        );
-        
-        // Create opponents with better starting positions
-        this.opponents = [];
-        const opponentStarts = [
-            { x: this.width / 2 - 40, y: this.height - 150 },
-            { x: this.width / 2 + 40, y: this.height - 150 },
-            { x: this.width / 2, y: this.height - 100 }
+        // Setup track
+        const trackDifficulty = [
+            { name: 'Tokyo', timeLimit: 60 },
+            { name: 'Paris', timeLimit: 65 },
+            { name: 'London', timeLimit: 70 },
+            { name: 'New York', timeLimit: 75 },
+            { name: 'Sydney', timeLimit: 80 }
         ];
         
-        for (let i = 0; i < 3; i++) {
-            const opp = new Opponent(
-                opponentStarts[i].x,
-                opponentStarts[i].y,
-                trackData,
-                i + 1
-            );
-            this.opponents.push(opp);
-        }
+        const td = trackDifficulty[this.currentTrack - 1];
+        this.timeLeft = td.timeLimit;
+        this.track = new Track();
         
-        this.lastFrameTime = Date.now();
+        // Player
+        this.player = new Car(400, 500, true);
+        
+        // Opponents
+        this.opponents = [
+            new Car(360, 500, false),
+            new Car(440, 500, false),
+            new Car(400, 450, false)
+        ];
+        
+        this.lastFrameTime = performance.now();
         this.gameLoop();
     }
     
     resetTrack() {
-        this.stopGame();
         this.startTrack();
     }
     
-    stopGame() {
-        this.gameRunning = false;
-        if (this.requestAnimationFrameId) {
-            cancelAnimationFrame(this.requestAnimationFrameId);
-        }
-    }
-    
-    gameLoop() {
-        const now = Date.now();
-        const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 0.016);
-        this.lastFrameTime = now;
-        
+    gameLoop = () => {
         if (!this.gameRunning) return;
         
-        // Update
-        this.update(deltaTime);
+        const now = performance.now();
+        const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 0.02);
+        this.lastFrameTime = now;
         
-        // Draw
+        this.update(deltaTime);
         this.draw();
         
-        this.requestAnimationFrameId = requestAnimationFrame(() => this.gameLoop());
+        requestAnimationFrame(this.gameLoop);
     }
     
     update(deltaTime) {
-        if (!this.finished) {
-            this.elapsedTime += deltaTime;
-            this.timeLeft = Math.max(0, this.track.trackData.timeLimit - this.elapsedTime);
-            
-            if (this.timeLeft === 0 && !this.timeLimitReached) {
-                this.timeLimitReached = true;
-                this.endRace();
-                return;
-            }
+        this.elapsedTime += deltaTime;
+        this.timeLeft -= deltaTime;
+        
+        if (this.timeLeft <= 0 && !this.finished) {
+            this.gameOver(false);
+            return;
         }
         
-        // Update player
-        this.updatePlayerInput();
+        // Player input
+        if (this.keys['arrowup'] || this.keys['w']) this.player.accelerate();
+        if (this.keys['arrowdown'] || this.keys['s']) this.player.brake();
+        if (this.keys['arrowleft'] || this.keys['a']) this.player.turnLeft();
+        if (this.keys['arrowright'] || this.keys['d']) this.player.turnRight();
+        
+        // Update cars
         this.player.update(deltaTime, this.track);
         
-        // Update opponents
         this.opponents.forEach(opp => {
-            opp.update(deltaTime, this.track, this.player);
+            opp.aiUpdate(deltaTime, this.track, this.player);
+            opp.update(deltaTime, this.track);
         });
         
-        // Calculate positions
-        this.calculatePositions();
+        // Check positions
+        const cars = [this.player, ...this.opponents];
+        cars.sort((a, b) => b.progress - a.progress);
+        this.finishPosition = cars.indexOf(this.player) + 1;
         
         // Check if player finished
-        if (!this.finished && this.player.distanceTraveled >= this.track.trackLength && this.player.y < this.height - 80) {
-            this.finishRace();
+        if (!this.finished && this.player.progress >= 1) {
+            this.gameOver(this.finishPosition <= 3);
         }
         
-        // Update UI
         this.updateUI();
     }
     
-    calculatePositions() {
-        const allCars = [this.player, ...this.opponents];
-        allCars.sort((a, b) => b.distanceTraveled - a.distanceTraveled);
-        
-        this.finishPosition = allCars.indexOf(this.player) + 1;
-    }
-    
-    updatePlayerInput() {
-        const keys = this.keys;
-        
-        // Steering
-        if (keys['arrowleft'] || keys['a']) this.player.turnLeft();
-        if (keys['arrowright'] || keys['d']) this.player.turnRight();
-        
-        // Throttle and Brake
-        if (keys['arrowup'] || keys['w'] || keys['z']) this.player.throttle();
-        if (keys['arrowdown'] || keys['s'] || keys['x']) this.player.brake();
-    }
-    
-    finishRace() {
+    gameOver(won) {
         this.finished = true;
-        setTimeout(() => this.endRace(), 1500);
-    }
-    
-    endRace() {
-        this.gameRunning = false;
         
-        if (this.finishPosition <= 3 && this.timeLeft > 0) {
-            // Advance to next track
-            if (this.currentTrack < 5) {
-                this.currentTrack++;
-                setTimeout(() => this.startTrack(), 1500);
-            } else {
-                // Game complete
-                this.showGameOver(true);
-            }
+        if (won && this.currentTrack < 5) {
+            this.currentTrack++;
+            setTimeout(() => this.startTrack(), 1000);
+        } else if (won) {
+            this.showGameOverScreen(true);
         } else {
-            // Game Over
-            this.showGameOver(false);
+            this.showGameOverScreen(false);
         }
     }
     
-    showGameOver(success) {
+    showGameOverScreen(won) {
+        this.gameRunning = false;
         this.showScreen('gameOverScreen');
-        this.gameState = 'gameOver';
         
         const title = document.getElementById('gameOverTitle');
-        if (success) {
-            title.textContent = 'CONGRATULATIONS!';
-        } else {
-            title.textContent = this.timeLimitReached ? 'TIME UP!' : this.finishPosition > 3 ? 'TOO SLOW!' : 'RACE OVER';
-        }
+        title.textContent = won ? 'CONGRATULATIONS!' : (this.timeLeft <= 0 ? 'TIME UP!' : 'RACE OVER');
         
         document.getElementById('finalPosition').textContent = this.finishPosition;
         document.getElementById('finalTime').textContent = this.formatTime(this.elapsedTime);
@@ -299,10 +205,10 @@ class Game {
     }
     
     updateUI() {
-        document.getElementById('position').textContent = `${this.finishPosition}/${this.opponents.length + 1}`;
-        document.getElementById('timer').textContent = this.formatTime(this.timeLeft);
-        document.getElementById('speed').textContent = Math.round(this.player.speed * 3.6); // km/h
-        document.getElementById('gear').textContent = this.player.gear === 'LOW' ? 'LOW' : 'HI';
+        document.getElementById('position').textContent = `${this.finishPosition}/4`;
+        document.getElementById('timer').textContent = this.formatTime(Math.max(0, this.timeLeft));
+        document.getElementById('speed').textContent = Math.round(this.player.speed * 3.6);
+        document.getElementById('gear').textContent = this.player.gear === 0 ? 'LOW' : 'HI';
     }
     
     formatTime(seconds) {
@@ -312,255 +218,124 @@ class Game {
     }
     
     draw() {
-        this.ctx.fillStyle = '#0a0a0a';
+        this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.width, this.height);
         
-        // Draw track
         this.track.draw(this.ctx, this.player);
-        
-        // Draw game objects
         this.player.draw(this.ctx);
         this.opponents.forEach(opp => opp.draw(this.ctx));
-        
-        // Draw finish line indicator
-        this.drawFinishLine();
-    }
-    
-    drawFinishLine() {
-        const finishY = -100;
-        const screenY = finishY - this.player.y + this.height / 2;
-        
-        if (screenY > 0 && screenY < this.height) {
-            this.ctx.strokeStyle = '#ffff00';
-            this.ctx.lineWidth = 4;
-            this.ctx.setLineDash([10, 10]);
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, screenY);
-            this.ctx.lineTo(this.width, screenY);
-            this.ctx.stroke();
-            this.ctx.setLineDash([]);
-        }
     }
 }
 
 class Track {
-    constructor(trackData, canvasWidth, canvasHeight) {
-        this.trackData = trackData;
-        this.canvasWidth = canvasWidth;
-        this.canvasHeight = canvasHeight;
-        this.trackLength = 3000; // Total track distance
-        this.trackWidth = trackData.width;
-        this.generateTrack();
+    constructor() {
+        this.width = 150;
+        this.length = 2000;
     }
     
-    generateTrack() {
-        // Generate track waypoints
-        this.waypoints = [];
-        const numWaypoints = Math.floor(this.trackLength / 150);
-        
-        for (let i = 0; i < numWaypoints; i++) {
-            const t = i / numWaypoints;
-            const wave = Math.sin(t * Math.PI * 3) * 60;
-            
-            this.waypoints.push({
-                x: this.canvasWidth / 2 + wave,
-                y: -i * 150,
-                width: this.trackWidth
-            });
-        }
-        
-        // Add finish line
-        this.waypoints.push({
-            x: this.canvasWidth / 2,
-            y: -this.trackLength,
-            width: this.trackWidth
-        });
+    isValid(x, y) {
+        const roadX = 400 + Math.sin(y / 200) * 50;
+        const distFromCenter = Math.abs(x - roadX);
+        return distFromCenter < this.width / 2;
     }
     
-    isPositionValid(x, y) {
-        // Find closest waypoint
-        let closestWaypoint = this.waypoints[0];
-        let closestDist = Infinity;
-        
-        for (let wp of this.waypoints) {
-            const dist = Math.abs(y - wp.y);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestWaypoint = wp;
-            }
-        }
-        
-        // Check if within track bounds
-        const distFromCenter = Math.abs(x - closestWaypoint.x);
-        return distFromCenter < closestWaypoint.width / 2;
-    }
-    
-    getTrackCenterX(y) {
-        // Find closest waypoint
-        let closest = this.waypoints[0];
-        let closestDist = Infinity;
-        
-        for (let wp of this.waypoints) {
-            const dist = Math.abs(y - wp.y);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = wp;
-            }
-        }
-        
-        return closest.x;
+    getRoadX(y) {
+        return 400 + Math.sin(y / 200) * 50;
     }
     
     draw(ctx, player) {
-        // Draw track
-        ctx.fillStyle = '#2a2a2a';
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 3;
+        const cameraY = player.y - 200;
         
-        const screenCenterY = ctx.canvas.height / 2;
-        
-        for (let i = 0; i < this.waypoints.length - 1; i++) {
-            const wp1 = this.waypoints[i];
-            const wp2 = this.waypoints[i + 1];
+        for (let y = Math.floor(cameraY); y < cameraY + 600; y += 20) {
+            const roadX = this.getRoadX(y);
+            const screenY = y - cameraY;
             
-            const screenY1 = wp1.y - player.y + screenCenterY;
-            const screenY2 = wp2.y - player.y + screenCenterY;
+            ctx.fillStyle = '#222';
+            ctx.fillRect(roadX - this.width / 2, screenY, this.width, 20);
             
-            if (screenY1 > -150 && screenY1 < ctx.canvas.height + 150) {
-                // Draw track area
-                ctx.fillStyle = '#2a2a2a';
-                ctx.fillRect(
-                    wp1.x - wp1.width / 2,
-                    screenY1,
-                    wp1.width,
-                    Math.abs(screenY2 - screenY1) + 20
-                );
-                
-                // Draw track borders
-                ctx.strokeStyle = '#ff6b6b';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(wp1.x - wp1.width / 2, screenY1);
-                ctx.lineTo(wp1.x - wp1.width / 2, screenY2);
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.moveTo(wp1.x + wp1.width / 2, screenY1);
-                ctx.lineTo(wp1.x + wp1.width / 2, screenY2);
-                ctx.stroke();
-                
-                // Draw center line
-                ctx.strokeStyle = '#555';
-                ctx.setLineDash([20, 20]);
-                ctx.beginPath();
-                ctx.moveTo(wp1.x, screenY1);
-                ctx.lineTo(wp1.x, screenY2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(roadX - this.width / 2, screenY, this.width, 20);
         }
     }
 }
 
-class Player {
-    constructor(x, y, trackData) {
+class Car {
+    constructor(x, y, isPlayer) {
         this.x = x;
         this.y = y;
-        this.trackData = trackData;
+        this.isPlayer = isPlayer;
         this.width = 16;
         this.height = 24;
-        this.speed = 0; // m/s
-        this.angle = 0; // radians (0 = up)
         
-        // Speed limits
-        this.maxSpeedLow = 20; // m/s
-        this.maxSpeedHi = 35; // m/s - increased for better racing
-        this.maxSpeed = this.maxSpeedLow;
-        this.acceleration = 15; // m/s^2 - increased
-        this.brakeAccel = 25; // m/s^2
+        this.speed = 0;
+        this.maxSpeed = [20, 35]; // LOW, HI
+        this.gear = 0; // 0=LOW, 1=HI
+        this.angle = 0;
         
-        this.gear = 'LOW';
-        this.distanceTraveled = 0;
+        this.acceleration = isPlayer ? 15 : 20;
+        this.friction = 0.97;
+        this.progress = 0;
         
         this.crashed = false;
-        this.crashTimer = 0;
-        this.lastValidX = x;
-        this.lastValidY = y;
+        this.crashTime = 0;
     }
     
-    turnLeft() {
-        if (this.speed > 1) {
-            const turnRate = (Math.min(Math.abs(this.speed), this.maxSpeed) / this.maxSpeed) * 0.08;
-            this.angle -= turnRate;
-        }
+    switchGear() {
+        this.gear = 1 - this.gear;
     }
     
-    turnRight() {
-        if (this.speed > 1) {
-            const turnRate = (Math.min(Math.abs(this.speed), this.maxSpeed) / this.maxSpeed) * 0.08;
-            this.angle += turnRate;
-        }
-    }
-    
-    throttle() {
+    accelerate() {
         if (!this.crashed) {
-            this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * 0.016);
+            this.speed = Math.min(this.maxSpeed[this.gear], this.speed + this.acceleration * 0.016);
         }
     }
     
     brake() {
-        this.speed = Math.max(0, this.speed - this.brakeAccel * 0.016);
+        this.speed = Math.max(0, this.speed - 25 * 0.016);
     }
     
-    toggleGear() {
-        if (this.gear === 'LOW') {
-            this.gear = 'HI';
-            this.maxSpeed = this.maxSpeedHi;
-        } else {
-            this.gear = 'LOW';
-            this.maxSpeed = this.maxSpeedLow;
-        }
+    turnLeft() {
+        if (this.speed > 0) this.angle -= 0.08;
     }
     
-    crash() {
-        if (!this.crashed) {
-            this.crashed = true;
-            this.crashTimer = 0.3;
-            this.speed *= 0.5;
-        }
+    turnRight() {
+        if (this.speed > 0) this.angle += 0.08;
+    }
+    
+    aiUpdate(deltaTime, track, player) {
+        // AI always accelerates
+        this.speed = Math.min(this.maxSpeed[1], this.speed + this.acceleration * 0.016);
+        
+        // Follow road
+        const roadX = track.getRoadX(this.y);
+        const diff = this.x - roadX;
+        
+        if (diff < -20) this.turnLeft();
+        if (diff > 20) this.turnRight();
     }
     
     update(deltaTime, track) {
-        // Update crash state
         if (this.crashed) {
-            this.crashTimer -= deltaTime;
-            if (this.crashTimer <= 0) {
-                this.crashed = false;
-            }
+            this.crashTime -= deltaTime;
+            if (this.crashTime <= 0) this.crashed = false;
         }
         
-        // Apply friction
-        this.speed *= 0.97;
+        this.speed *= this.friction;
         
-        // Update position
         const newX = this.x + Math.sin(this.angle) * this.speed * deltaTime;
         const newY = this.y - Math.cos(this.angle) * this.speed * deltaTime;
         
-        // Check track bounds
-        if (track.isPositionValid(newX, newY)) {
+        if (track.isValid(newX, newY)) {
             this.x = newX;
             this.y = newY;
-            this.lastValidX = this.x;
-            this.lastValidY = this.y;
         } else {
-            // Keep position, bounce back
-            this.x = this.lastValidX;
-            this.y = this.lastValidY;
-            this.crash();
+            this.speed *= 0.5;
+            this.crashed = true;
+            this.crashTime = 0.3;
         }
         
-        // Update distance traveled (progress up the track)
-        this.distanceTraveled = -this.y;
+        this.progress = -this.y / track.length;
     }
     
     draw(ctx) {
@@ -568,86 +343,11 @@ class Player {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
         
-        // Draw car body
-        ctx.fillStyle = this.crashed ? '#ff4444' : '#00ff00';
+        ctx.fillStyle = this.isPlayer 
+            ? (this.crashed ? '#ff4444' : '#00ff00')
+            : (this.crashed ? '#ff4444' : '#ff0000');
         ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
         
-        // Draw windshield
-        ctx.fillStyle = '#00aaff';
-        ctx.fillRect(-this.width / 2 + 2, -this.height / 2 + 2, this.width - 4, this.height / 3);
-        
-        // Draw headlights
-        ctx.fillStyle = '#ffff00';
-        ctx.fillRect(-this.width / 2 + 3, -this.height / 2 - 1, 2, 2);
-        ctx.fillRect(this.width / 2 - 5, -this.height / 2 - 1, 2, 2);
-        
-        ctx.restore();
-    }
-}
-
-class Opponent extends Player {
-    constructor(x, y, trackData, id) {
-        super(x, y, trackData);
-        this.id = id;
-        this.aiTimer = 0;
-        this.aiDecisionTimer = 0;
-        this.colors = ['#ff4444', '#ffff00', '#00ffff'];
-        this.color = this.colors[id - 1];
-        
-        // Boost opponent speeds
-        this.maxSpeedLow = 22; // Faster than player LOW
-        this.maxSpeedHi = 40; // Significantly faster than player HI
-        this.maxSpeed = this.maxSpeedLow;
-        this.acceleration = 18; // Faster acceleration
-    }
-    
-    update(deltaTime, track, player) {
-        // AI decision making every 0.25 seconds
-        this.aiDecisionTimer -= deltaTime;
-        
-        if (this.aiDecisionTimer <= 0) {
-            this.aiDecisionTimer = 0.25;
-            
-            // Always accelerate aggressively
-            this.throttle();
-            
-            // Smart steering to stay on track
-            const trackCenterX = track.getTrackCenterX(this.y);
-            const distFromCenter = this.x - trackCenterX;
-            
-            if (Math.abs(distFromCenter) > track.trackData.width / 2.5) {
-                // Strong correction
-                if (distFromCenter > 0) {
-                    this.turnLeft();
-                    this.turnLeft();
-                } else {
-                    this.turnRight();
-                    this.turnRight();
-                }
-            } else if (Math.abs(distFromCenter) > track.trackData.width / 3) {
-                // Gentle correction
-                if (distFromCenter > 0) {
-                    this.turnLeft();
-                } else {
-                    this.turnRight();
-                }
-            }
-        }
-        
-        // Call parent update
-        super.update(deltaTime, track);
-    }
-    
-    draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        
-        // Draw car body
-        ctx.fillStyle = this.crashed ? '#ff4444' : this.color;
-        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-        
-        // Draw windshield
         ctx.fillStyle = '#00aaff';
         ctx.fillRect(-this.width / 2 + 2, -this.height / 2 + 2, this.width - 4, this.height / 3);
         
@@ -655,7 +355,6 @@ class Opponent extends Player {
     }
 }
 
-// Initialize game when page loads
 window.addEventListener('DOMContentLoaded', () => {
     window.game = new Game();
 });
