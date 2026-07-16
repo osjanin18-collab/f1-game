@@ -22,7 +22,7 @@ class Game {
         this.finishPosition = 0;
         
         this.keys = {};
-        this.lastGear = false;
+        this.gearKeyDown = false;
         
         this.lastFrameTime = 0;
         this.setupEventListeners();
@@ -47,18 +47,27 @@ class Game {
         document.getElementById('menuBtn').addEventListener('click', () => this.showMenu());
         
         document.addEventListener('keydown', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
+            const key = e.key.toLowerCase();
             
-            // Gear switch
-            if (e.key.toLowerCase() === 'g' && !this.lastGear && this.player) {
-                this.lastGear = true;
-                this.player.switchGear();
+            // Handle G key separately
+            if (key === 'g') {
+                if (!this.gearKeyDown && this.gameRunning && this.player) {
+                    console.log('Gear switch triggered');
+                    this.gearKeyDown = true;
+                    this.player.switchGear();
+                }
+            } else {
+                this.keys[key] = true;
             }
         });
         
         document.addEventListener('keyup', (e) => {
-            this.keys[e.key.toLowerCase()] = false;
-            if (e.key.toLowerCase() === 'g') this.lastGear = false;
+            const key = e.key.toLowerCase();
+            if (key === 'g') {
+                this.gearKeyDown = false;
+            } else {
+                this.keys[key] = false;
+            }
         });
     }
     
@@ -97,7 +106,7 @@ class Game {
         this.elapsedTime = 0;
         this.finished = false;
         this.finishPosition = 0;
-        this.lastGear = false;
+        this.gearKeyDown = false;
         
         // Setup track
         const trackDifficulty = [
@@ -162,7 +171,7 @@ class Game {
         this.player.update(deltaTime, this.track);
         
         this.opponents.forEach(opp => {
-            opp.aiUpdate(deltaTime, this.track, this.player);
+            opp.aiUpdate(deltaTime, this.track);
             opp.update(deltaTime, this.track);
         });
         
@@ -279,10 +288,13 @@ class Car {
         
         this.crashed = false;
         this.crashTime = 0;
+        
+        this.aiTimer = 0;
     }
     
     switchGear() {
         this.gear = 1 - this.gear;
+        console.log('Gear switched to: ' + (this.gear === 0 ? 'LOW' : 'HI'));
     }
     
     accelerate() {
@@ -303,16 +315,26 @@ class Car {
         if (this.speed > 0) this.angle += 0.08;
     }
     
-    aiUpdate(deltaTime, track, player) {
-        // AI always accelerates
+    aiUpdate(deltaTime, track) {
+        // AI always accelerates in HI gear
+        this.gear = 1;
         this.speed = Math.min(this.maxSpeed[1], this.speed + this.acceleration * 0.016);
         
-        // Follow road
-        const roadX = track.getRoadX(this.y);
-        const diff = this.x - roadX;
-        
-        if (diff < -20) this.turnLeft();
-        if (diff > 20) this.turnRight();
+        // Gentle steering to follow road
+        this.aiTimer += deltaTime;
+        if (this.aiTimer > 0.1) {
+            this.aiTimer = 0;
+            
+            const roadX = track.getRoadX(this.y);
+            const diff = this.x - roadX;
+            
+            // Smooth steering - don't turn sharply
+            if (diff < -10) {
+                this.angle -= 0.05;
+            } else if (diff > 10) {
+                this.angle += 0.05;
+            }
+        }
     }
     
     update(deltaTime, track) {
