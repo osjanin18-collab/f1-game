@@ -24,6 +24,7 @@ class Game {
         this.finishPosition = 0;
         
         this.keys = {};
+        this.gearPressed = false; // Track gear key separately
         this.setupEventListeners();
         
         this.lastFrameTime = 0;
@@ -84,12 +85,26 @@ class Game {
         
         // Keyboard controls
         window.addEventListener('keydown', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
+            const key = e.key.toLowerCase();
+            this.keys[key] = true;
+            
+            // Handle gear key with proper detection
+            if (key === 'g' && !this.gearPressed) {
+                this.gearPressed = true;
+                if (this.player) {
+                    this.player.toggleGear();
+                }
+            }
             if (e.key === ' ') e.preventDefault();
         });
         
         window.addEventListener('keyup', (e) => {
-            this.keys[e.key.toLowerCase()] = false;
+            const key = e.key.toLowerCase();
+            this.keys[key] = false;
+            
+            if (key === 'g') {
+                this.gearPressed = false;
+            }
         });
     }
     
@@ -129,6 +144,7 @@ class Game {
         this.finishPosition = 0;
         this.timeLimitReached = false;
         this.elapsedTime = 0;
+        this.gearPressed = false;
         
         const trackData = this.tracks[this.difficulty][this.currentTrack - 1];
         this.track = new Track(trackData, this.width, this.height);
@@ -241,12 +257,6 @@ class Game {
         // Throttle and Brake
         if (keys['arrowup'] || keys['w'] || keys['z']) this.player.throttle();
         if (keys['arrowdown'] || keys['s'] || keys['x']) this.player.brake();
-        
-        // Gear change
-        if (keys['g'] && !this.lastGKey) {
-            this.player.toggleGear();
-        }
-        this.lastGKey = keys['g'];
     }
     
     finishRace() {
@@ -463,11 +473,11 @@ class Player {
         this.angle = 0; // radians (0 = up)
         
         // Speed limits
-        this.maxSpeedLow = 20; // m/s ~ 72 km/h
-        this.maxSpeedHi = 30; // m/s ~ 108 km/h
+        this.maxSpeedLow = 20; // m/s
+        this.maxSpeedHi = 35; // m/s - increased for better racing
         this.maxSpeed = this.maxSpeedLow;
-        this.acceleration = 12; // m/s^2
-        this.brakeAccel = 20; // m/s^2
+        this.acceleration = 15; // m/s^2 - increased
+        this.brakeAccel = 25; // m/s^2
         
         this.gear = 'LOW';
         this.distanceTraveled = 0;
@@ -583,37 +593,40 @@ class Opponent extends Player {
         this.aiDecisionTimer = 0;
         this.colors = ['#ff4444', '#ffff00', '#00ffff'];
         this.color = this.colors[id - 1];
+        
+        // Boost opponent speeds
+        this.maxSpeedLow = 22; // Faster than player LOW
+        this.maxSpeedHi = 40; // Significantly faster than player HI
+        this.maxSpeed = this.maxSpeedLow;
+        this.acceleration = 18; // Faster acceleration
     }
     
     update(deltaTime, track, player) {
-        // AI decision making every 0.3 seconds
-        this.aiTimer += deltaTime;
+        // AI decision making every 0.25 seconds
         this.aiDecisionTimer -= deltaTime;
         
         if (this.aiDecisionTimer <= 0) {
-            this.aiDecisionTimer = 0.3;
+            this.aiDecisionTimer = 0.25;
             
-            // Always try to accelerate
-            if (Math.random() > 0.05) {
-                this.throttle();
-            } else {
-                this.brake();
-            }
+            // Always accelerate aggressively
+            this.throttle();
             
-            // Try to stay on track
+            // Smart steering to stay on track
             const trackCenterX = track.getTrackCenterX(this.y);
             const distFromCenter = this.x - trackCenterX;
             
-            if (Math.abs(distFromCenter) > track.trackData.width / 3) {
-                // Steer back to track
+            if (Math.abs(distFromCenter) > track.trackData.width / 2.5) {
+                // Strong correction
                 if (distFromCenter > 0) {
+                    this.turnLeft();
                     this.turnLeft();
                 } else {
                     this.turnRight();
+                    this.turnRight();
                 }
-            } else if (Math.random() > 0.8) {
-                // Random steering
-                if (Math.random() > 0.5) {
+            } else if (Math.abs(distFromCenter) > track.trackData.width / 3) {
+                // Gentle correction
+                if (distFromCenter > 0) {
                     this.turnLeft();
                 } else {
                     this.turnRight();
