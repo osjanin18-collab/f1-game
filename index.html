@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F-1 Race Game - 1984</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="gameContainer" class="game-container">
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="screen active">
+            <div class="menu-content">
+                <h1 class="game-title">F-1 RACE</h1>
+                <p class="subtitle">HAL Laboratory × Nintendo</p>
+                
+                <div class="menu-buttons">
+                    <button id="startBtn" class="menu-btn">START GAME</button>
+                    <button id="instructionsBtn" class="menu-btn">INSTRUCTIONS</button>
+                    <button id="aboutBtn" class="menu-btn">ABOUT</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Difficulty Selection -->
+        <div id="difficultyScreen" class="screen">
+            <div class="difficulty-content">
+                <h2>SELECT DIFFICULTY</h2>
+                <div class="difficulty-buttons">
+                    <button class="difficulty-btn" data-difficulty="1">
+                        <span class="difficulty-level">EASY</span>
+                        <span class="difficulty-desc">5 Tracks</span>
+                    </button>
+                    <button class="difficulty-btn" data-difficulty="2">
+                        <span class="difficulty-level">NORMAL</span>
+                        <span class="difficulty-desc">5 Tracks</span>
+                    </button>
+                    <button class="difficulty-btn" data-difficulty="3">
+                        <span class="difficulty-level">HARD</span>
+                        <span class="difficulty-desc">5 Tracks</span>
+                    </button>
+                </div>
+                <button id="backBtn" class="back-btn">BACK</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen">
+            <div class="game-header">
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">POSITION</span>
+                        <span id="position" class="stat-value">1/4</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">TIME</span>
+                        <span id="timer" class="stat-value">0:00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">SPEED</span>
+                        <span id="speed" class="stat-value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">GEAR</span>
+                        <span id="gear" class="stat-value">LOW</span>
+                    </div>
+                </div>
+            </div>
+            
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            
+            <div class="game-controls">
+                <div class="control-info">
+                    <p>↑↓← → to drive | A/Z for throttle | S/X for brake | G to toggle gear</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen">
+            <div class="game-over-content">
+                <h2 id="gameOverTitle">GAME OVER</h2>
+                <div class="game-over-stats">
+                    <p>Final Position: <span id="finalPosition">-</span></p>
+                    <p>Time: <span id="finalTime">-</span></p>
+                    <p>Track: <span id="finalTrack">-</span>/5</p>
+                </div>
+                <div class="game-over-buttons">
+                    <button id="retryBtn" class="menu-btn">RETRY</button>
+                    <button id="menuBtn" class="menu-btn">MAIN MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Screen -->
+        <div id="instructionsScreen" class="screen">
+            <div class="instructions-content">
+                <h2>HOW TO PLAY</h2>
+                <div class="instructions-text">
+                    <h3>Controls</h3>
+                    <ul>
+                        <li><strong>↑↓← →</strong> - Steer your car</li>
+                        <li><strong>A / Z</strong> - Accelerate</li>
+                        <li><strong>S / X</strong> - Brake</li>
+                        <li><strong>G</strong> - Toggle Gear (LOW/HI)</li>
+                    </ul>
+                    
+                    <h3>Gears</h3>
+                    <ul>
+                        <li><strong>LOW:</strong> Low speed, fast acceleration</li>
+                        <li><strong>HI:</strong> High speed, slower acceleration</li>
+                    </ul>
+                    
+                    <h3>Objective</h3>
+                    <ul>
+                        <li>Complete each track within the time limit</li>
+                        <li>Finish in top 3 to advance to next track</li>
+                        <li>3 difficulty levels with 5 tracks each</li>
+                        <li>Avoid crashes - they cost precious seconds</li>
+                    </ul>
+                </div>
+                <button id="backFromInstructionsBtn" class="back-btn">BACK</button>
+            </div>
+        </div>
+
+        <!-- About Screen -->
+        <div id="aboutScreen" class="screen">
+            <div class="about-content">
+                <h2>ABOUT F-1 RACE</h2>
+                <div class="about-text">
+                    <p><strong>Original Game:</strong> 1984 - HAL Laboratory & Nintendo</p>
+                    <p><strong>Platform:</strong> Family Computer (Famicom)</p>
+                    <p><strong>Web Version:</strong> 2024</p>
+                    
+                    <h3>Features</h3>
+                    <ul>
+                        <li>Top-down racing action</li>
+                        <li>Two-speed manual transmission</li>
+                        <li>3 difficulty levels</li>
+                        <li>5 unique tracks per difficulty</li>
+                        <li>AI opponents</li>
+                        <li>Collision physics</li>
+                    </ul>
+                    
+                    <h3>Game Description</h3>
+                    <p>F-1 Race is one of the first attempts to bring Formula 1 excitement to home consoles. Race on tracks inspired by world capitals and compete against AI drivers.</p>
+                </div>
+                <button id="backFromAboutBtn" class="back-btn">BACK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
